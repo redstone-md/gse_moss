@@ -970,7 +970,9 @@ void Networking::init_moss(const Moss_Config &cfg)
         mesh_id = "gse-room-" + cfg.room_key;
         channel = "gse-room-" + cfg.room_key;
     } else {
-        mesh_id = "gse-global";
+        // join the shared, populated "global" moss mesh (matches the moss reference
+        // network) so relay-capable supernodes are available to bridge NATed peers.
+        mesh_id = "global";
         channel = "gse-app-" + std::to_string(this->appid);
     }
     PRINT_DEBUG("[MOSS-DIAG] init_moss mesh='%s' channel='%s' appid=%u", mesh_id.c_str(), channel.c_str(), this->appid);
