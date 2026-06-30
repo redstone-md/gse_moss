@@ -953,20 +953,27 @@ void Networking::init_moss(const Moss_Config &cfg)
 {
     if (moss) return;
 
-    // The rendezvous "scope" controls BOTH the tracker infohash (who meets in the
-    // mesh) and the pub/sub channel (who exchanges messages). They must be the same
-    // string on every peer that wants to play together. With a room key, peers align
-    // regardless of appid (handy when the emulated appid differs between machines);
-    // otherwise the scope is the appid so same-game peers find each other by default.
-    std::string scope;
+    // mesh_id selects the tracker infohash = which peers share the transport mesh.
+    // channel selects the pub/sub topic = which peers exchange application messages.
+    //
+    // By default we join ONE big global mesh: a large shared mesh has relay-capable
+    // supernodes, so two peers behind NAT that can't connect directly can still be
+    // bridged through a relay (a tiny private 2-peer mesh has no such fallback). The
+    // channel is then scoped to the appid so only same-game peers actually talk.
+    //
+    // A room key opts into a fully isolated private mesh+channel instead (only peers
+    // sharing the key meet at all) — use it when you want privacy and have direct or
+    // your own relay connectivity.
+    std::string mesh_id;
+    std::string channel;
     if (!cfg.room_key.empty()) {
-        scope = "gse-room-" + cfg.room_key;
+        mesh_id = "gse-room-" + cfg.room_key;
+        channel = "gse-room-" + cfg.room_key;
     } else {
-        scope = "gse-app-" + std::to_string(this->appid);
+        mesh_id = "gse-global";
+        channel = "gse-app-" + std::to_string(this->appid);
     }
-    std::string mesh_id = scope;
-    std::string channel = scope;
-    PRINT_DEBUG("[MOSS-DIAG] init_moss scope='%s' appid=%u", scope.c_str(), this->appid);
+    PRINT_DEBUG("[MOSS-DIAG] init_moss mesh='%s' channel='%s' appid=%u", mesh_id.c_str(), channel.c_str(), this->appid);
 
     moss = new MossTransport();
     bool ok = moss->init(mesh_id, channel, cfg.psk, cfg.trackers, cfg.static_peers,
