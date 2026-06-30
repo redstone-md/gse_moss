@@ -266,7 +266,10 @@ bool MossTransport::publish(const uint8_t *data, uint32_t len)
 {
     if (!enabled || !p_Publish || node < 0) return false;
     int32_t rc = p_Publish(node, &channel[0], const_cast<uint8_t *>(data), len);
-    // MOSS_ERR_NO_PEERS (-6) just means nobody is listening yet; not fatal
+    // rc 0 = flooded to >=1 topic peer; -6 = MOSS_ERR_NO_PEERS (nobody grafted on
+    // this topic yet). Logging this distinguishes "topic mesh empty / GRAFT failed"
+    // from "delivered but not received".
+    PRINT_DEBUG("[MOSS-DIAG] publish channel='%s' len=%u rc=%d", channel.c_str(), len, rc);
     return rc == 0 || rc == -6;
 }
 
