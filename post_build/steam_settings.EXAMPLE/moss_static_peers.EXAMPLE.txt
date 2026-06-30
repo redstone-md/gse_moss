@@ -1,0 +1,13 @@
+# moss static peers — one host:port per line.
+# moss will dial these directly in addition to (or instead of) tracker discovery.
+# Lines starting with # or ; are ignored.
+#
+# Rename this file to "moss_static_peers.txt" to use it.
+#
+# Use cases:
+#  - zero-tracker LAN play: put a host machine's LAN address here on every client
+#  - direct connect to a friend who port-forwarded / has a public IP
+#
+# Example:
+# 192.168.1.50:41001
+# 203.0.113.10:41001

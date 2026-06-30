@@ -811,7 +811,7 @@ bool Networking::handle_low_level_udp(Common_Message *msg, IP_PORT ip_port)
 
 #define NUM_TCP_WAITING 128
 
-Networking::Networking(CSteamID id, uint32 appid, uint16 port, std::set<IP_PORT> *custom_broadcasts, bool disable_sockets, bool crossapp_messaging)
+Networking::Networking(CSteamID id, uint32 appid, uint16 port, std::set<IP_PORT> *custom_broadcasts, bool disable_sockets, bool crossapp_messaging, const Moss_Config *moss_config)
 {
     tcp_port = udp_port = port;
     own_ip = 0x7F000001;
@@ -823,6 +823,14 @@ Networking::Networking(CSteamID id, uint32 appid, uint16 port, std::set<IP_PORT>
         enabled = false;
         udp_socket = -1;
         tcp_socket = -1;
+        // moss is independent of the LAN sockets: it can still run even when the
+        // legacy UDP/TCP transport is disabled, giving a pure-P2P experience.
+        if (moss_config && moss_config->enabled) {
+            PRINT_DEBUG("ADDED ID %llu", (uint64)id.ConvertToUint64());
+            ids.push_back(id);
+            init_moss(*moss_config);
+            if (moss && moss->is_enabled()) enabled = true;
+        }
         return;
     }
 
@@ -911,11 +919,21 @@ Networking::Networking(CSteamID id, uint32 appid, uint16 port, std::set<IP_PORT>
     PRINT_DEBUG("ADDED ID %llu", (uint64)id.ConvertToUint64());
     ids.push_back(id);
 
+    if (moss_config && moss_config->enabled) {
+        init_moss(*moss_config);
+    }
+
     reset_last_error();
 }
 
 Networking::~Networking()
 {
+    if (moss) {
+        moss->shutdown();
+        delete moss;
+        moss = nullptr;
+    }
+
     for (auto &c : connections) {
         kill_tcp_socket(c.tcp_socket_incoming);
         kill_tcp_socket(c.tcp_socket_outgoing);
@@ -929,6 +947,148 @@ Networking::~Networking()
     kill_socket(tcp_socket);
 
     curl_global_cleanup();
+}
+
+void Networking::init_moss(const Moss_Config &cfg)
+{
+    if (moss) return;
+
+    // mesh_id selects the rendezvous (tracker infohash): per-appid by default,
+    // or a private room when a room key is configured.
+    std::string mesh_id;
+    if (!cfg.room_key.empty()) {
+        mesh_id = "gse-room-" + cfg.room_key;
+    } else {
+        mesh_id = "gse-app-" + std::to_string(this->appid);
+    }
+    // channel is always appid-scoped so a shared room mesh still separates games
+    std::string channel = "gse-app-" + std::to_string(this->appid);
+
+    moss = new MossTransport();
+    bool ok = moss->init(mesh_id, channel, cfg.psk, cfg.trackers, cfg.static_peers,
+                         cfg.identity_path, /*high_throughput*/ true);
+    if (!ok) {
+        PRINT_DEBUG("moss: init failed, continuing with LAN transport only");
+        delete moss;
+        moss = nullptr;
+        return;
+    }
+    // announce ourselves right away so existing peers learn us quickly
+    send_moss_presence();
+    last_moss_presence = std::chrono::high_resolution_clock::now();
+}
+
+void Networking::send_moss_presence()
+{
+    if (!moss || !moss->is_enabled() || ids.empty()) return;
+    Common_Message msg = create_announce(false); // PONG carries our ids + known peers
+    size_t size = msg.ByteSizeLong();
+    std::vector<uint8_t> buffer(size);
+    if (!msg.SerializeToArray(buffer.data(), static_cast<int>(size))) {
+        PRINT_DEBUG("send_moss_presence: serialize failed");
+        return;
+    }
+    moss->publish(buffer);
+}
+
+bool Networking::moss_publish_msg(Common_Message *msg)
+{
+    if (!moss || !moss->is_enabled()) return false;
+    size_t size = msg->ByteSizeLong();
+    std::vector<uint8_t> buffer(size);
+    if (!msg->SerializeToArray(buffer.data(), static_cast<int>(size))) {
+        PRINT_DEBUG("moss_publish_msg: serialize failed");
+        return false;
+    }
+    return moss->publish(buffer);
+}
+
+bool Networking::handle_moss_announce(Common_Message *msg, const std::array<uint8_t, 32> &sender)
+{
+    uint32 ann_appid = msg->announce().appid();
+
+    Connection *conn = find_connection((uint64)msg->source_id(), ann_appid);
+    // If we already reach this peer via a live LAN connection, keep LAN and just
+    // refresh liveness — don't hijack it onto moss (avoids duplicate delivery).
+    if (conn && !conn->via_moss) {
+        conn->last_received = std::chrono::high_resolution_clock::now();
+        return true;
+    }
+
+    bool is_new = false;
+    if (!conn) {
+        conn = new_connection((uint64)msg->source_id(), ann_appid);
+        if (!conn) {
+            // a connection for this appid exists under another lookup; bail safely
+            return false;
+        }
+        is_new = true;
+    }
+
+    conn->via_moss = true;
+    conn->moss_sender = sender;
+    conn->appid = ann_appid;
+    // synthesize a stable, non-zero IP so callers of getIP()/getPort() behave.
+    // 10.x.x.x derived from the SteamID low bits (host byte order kept in net order
+    // form because getIP() applies ntohl()).
+    conn->tcp_ip_port.ip = htonl(0x0A000000u | (uint32)(msg->source_id() & 0x00FFFFFFu));
+    conn->tcp_ip_port.port = htons((uint16)msg->announce().tcp_port());
+    conn->udp_pinged = false; // force the reliable (moss publish) send path
+
+    bool was_connected = conn->connected;
+    for (int i = 0; i < msg->announce().ids_size(); ++i) {
+        add_id_connection(conn, (uint64) msg->announce().ids(i));
+    }
+    conn->last_received = std::chrono::high_resolution_clock::now();
+
+    if (!was_connected) {
+        conn->connected = true;
+        for (auto &steam_id : conn->ids) {
+            run_callback_user(steam_id, true, conn->appid);
+        }
+    }
+
+    // reply with our own presence so a freshly-seen peer learns us without waiting
+    if (is_new) {
+        send_moss_presence();
+    }
+    return true;
+}
+
+void Networking::run_moss()
+{
+    if (!moss || !moss->is_enabled()) return;
+
+    std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
+    if (check_timedout(last_moss_presence, BROADCAST_INTERVAL)) {
+        send_moss_presence();
+        last_moss_presence = now;
+    }
+
+    std::vector<MossInbound> msgs;
+    moss->poll_messages(msgs);
+    for (auto &m : msgs) {
+        // drop our own echoed publishes (moss delivers local publishes back to us);
+        // self-delivery for messages addressed to ourselves still flows via local_send.
+        if (m.sender == moss->own_public_key()) continue;
+
+        Common_Message msg;
+        if (!msg.ParseFromArray(m.data.data(), static_cast<int>(m.data.size()))) continue;
+        if (!msg.source_id()) continue;
+
+        if (msg.has_announce()) {
+            handle_moss_announce(&msg, m.sender);
+        } else {
+            // mark synthetic source addressing then dispatch like any other message
+            msg.set_source_ip(0x0A000000u | (uint32)(msg.source_id() & 0x00FFFFFFu));
+            do_callbacks_message(&msg);
+        }
+    }
+
+    std::vector<MossEvent> evs;
+    moss->poll_events(evs);
+    // peer join/leave at the transport layer is informational here; application
+    // level presence/timeout is driven by announce messages + USER_TIMEOUT.
 }
 
 Common_Message Networking::create_announce(bool request)
@@ -991,9 +1151,12 @@ void Networking::Run()
         return;
     }
 
+    // pump the moss P2P transport (discovery, inbound messages, presence)
+    run_moss();
+
     //PRINT_DEBUG("%lf", time_extra);
     // PRINT_DEBUG_ENTRY();
-    if (check_timedout(last_broadcast, BROADCAST_INTERVAL)) {
+    if (is_socket_valid(udp_socket) && check_timedout(last_broadcast, BROADCAST_INTERVAL)) {
         send_announce_broadcasts();
     }
 
@@ -1125,6 +1288,8 @@ void Networking::Run()
 
     // PRINT_DEBUG("CONNECTIONS %zu", connections.size());
     for (auto &conn: connections) {
+        // moss peers have no LAN sockets; their liveness is driven by announce + USER_TIMEOUT
+        if (conn.via_moss) continue;
         if (!is_tcp_socket_valid(conn.tcp_socket_outgoing)) {
             sock = static_cast<sock_t>(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
             if (is_socket_valid(sock) && set_socket_nonblocking(sock)) {
@@ -1232,6 +1397,9 @@ void Networking::Run()
     }
 
     for (auto &conn: connections) {
+        // moss peers don't use tcp sockets; their connected state is managed by
+        // handle_moss_announce + the USER_TIMEOUT sweep above. Skip the socket check.
+        if (conn.via_moss) continue;
         if (!(conn.tcp_socket_incoming.received_data || conn.tcp_socket_outgoing.received_data)) {
             if (conn.connected) {
                 for (auto &steam_id : conn.ids) {
@@ -1259,7 +1427,10 @@ void Networking::addListenId(CSteamID id)
 
     PRINT_DEBUG("ADDED ID %llu", (uint64)id.ConvertToUint64());
     ids.push_back(id);
-    send_announce_broadcasts();
+    if (is_socket_valid(udp_socket)) {
+        send_announce_broadcasts();
+    }
+    send_moss_presence();
     return;
 }
 
@@ -1341,6 +1512,14 @@ bool Networking::sendTo(Common_Message *msg, bool reliable, Connection *conn, bo
 
     if (!conn) {
         conn = find_connection(dest_id, any_appid ? 0 : this->appid);
+    }
+
+    // moss-backed peers are reached by publishing the (already dest-addressed)
+    // message to the mesh channel; receivers filter by dest_id.
+    if (!ret && conn && conn->via_moss) {
+        ret = moss_publish_msg(msg);
+        reset_last_error();
+        return ret;
     }
 
     if (!ret && conn) {

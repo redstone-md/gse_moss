@@ -77,7 +77,15 @@ Steam_Client::Steam_Client()
         std::chrono::duration_cast<std::chrono::milliseconds>(initial_delay),
         std::chrono::duration_cast<std::chrono::milliseconds>(max_stall_ms)
     );
-    network = new Networking(settings_server->get_local_steam_id(), appid, settings_server->get_port(), &(settings_server->custom_broadcasts), settings_server->disable_networking, settings_server->enable_crossapp_messaging);
+    Moss_Config moss_config{};
+    moss_config.enabled = settings_server->enable_moss;
+    moss_config.room_key = settings_server->moss_room_key;
+    moss_config.trackers = settings_server->moss_trackers;
+    moss_config.static_peers = settings_server->moss_static_peers;
+    moss_config.psk = settings_server->moss_psk;
+    moss_config.identity_path = local_storage->get_global_settings_path() + "moss_identity.bin";
+
+    network = new Networking(settings_server->get_local_steam_id(), appid, settings_server->get_port(), &(settings_server->custom_broadcasts), settings_server->disable_networking, settings_server->enable_crossapp_messaging, &moss_config);
 
     run_every_runcb = new RunEveryRunCB();
 

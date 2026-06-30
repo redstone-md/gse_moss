@@ -293,6 +293,19 @@ public:
     // allow friend messages (chat, avatars) to reach friends on different appids
     bool enable_crossapp_messaging = true;
 
+    // ---- moss P2P transport (internet-wide mesh over trackers + NAT traversal) ----
+    // master switch; when true the Networking layer also runs a moss node alongside LAN broadcast
+    bool enable_moss = true;
+    // optional shared "room"/network key. empty => mesh is scoped per appid (global per-game).
+    // non-empty => private mesh shared only by peers using the same key.
+    std::string moss_room_key{};
+    // optional tracker override (udp://host:port/announce or http(s)://...). empty => moss defaults.
+    std::vector<std::string> moss_trackers{};
+    // optional explicit peers to dial directly (host:port), e.g. for LAN/manual bootstrap.
+    std::vector<std::string> moss_static_peers{};
+    // optional 32-byte pre-shared key for an encrypted closed mesh. empty => open mesh.
+    std::vector<uint8_t> moss_psk{};
+
     //gameserver source query
     bool disable_source_query = false;
 

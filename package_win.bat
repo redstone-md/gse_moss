@@ -48,6 +48,16 @@ copy /y "%ROOT%\post_build\README.release.md" "%TARGET_DIR%\"
 copy /y "%ROOT%\CHANGELOG.md" "%TARGET_DIR%\"
 copy /y "%ROOT%\CREDITS.md" "%TARGET_DIR%\"
 
+echo:// bundling moss P2P runtime (loaded dynamically at runtime, 64-bit)
+rem drop moss.dll next to every built 64-bit steam_api so it sits beside the game exe
+if exist "%ROOT%\third-party\moss\moss.dll" (
+  copy /y "%ROOT%\third-party\moss\moss.dll" "%TARGET_DIR%\"
+  copy /y "%ROOT%\third-party\moss\README.md" "%TARGET_DIR%\README.moss.md"
+  for /r "%TARGET_DIR%" %%F in (steam_api64.dll) do (
+    copy /y "%ROOT%\third-party\moss\moss.dll" "%%~dpF" >nul
+  )
+)
+
 if %BUILD_DEBUG% equ 1 (
   copy /y "%ROOT%\post_build\README.debug.md" "%TARGET_DIR%\"
 )

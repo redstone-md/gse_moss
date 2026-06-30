@@ -19,7 +19,9 @@
 #define NETWORK_INCLUDE
 
 #include "base.h"
+#include "moss_transport.h"
 #include <curl/curl.h>
+#include <array>
 
 #define DEFAULT_PORT 47584
 #define NUM_QUERY_PORTS 10
@@ -96,6 +98,22 @@ struct Connection {
     std::chrono::high_resolution_clock::time_point last_received{};
     uint32 known_ips[16]{};   // all IPs seen from this peer (host byte order)
     int known_ip_count = 0;
+
+    // moss P2P: when true this peer is reachable over the moss mesh instead of
+    // LAN sockets. Sends are routed via MossTransport::publish, and the TCP/UDP
+    // socket machinery is bypassed for this connection.
+    bool via_moss = false;
+    std::array<uint8_t, 32> moss_sender{}; // peer's moss public key (identity)
+};
+
+// Configuration for the optional moss P2P transport, built from Settings.
+struct Moss_Config {
+    bool enabled = false;
+    std::string room_key{};                 // empty => mesh scoped per appid
+    std::vector<std::string> trackers{};     // empty => moss defaults
+    std::vector<std::string> static_peers{}; // optional direct dial peers
+    std::vector<uint8_t> psk{};              // optional 32-byte pre-shared key
+    std::string identity_path{};             // file to persist node identity
 };
 
 class Networking
@@ -120,6 +138,10 @@ class Networking
     struct Network_Callback_Container callbacks[CALLBACK_IDS_MAX];
     std::vector<Common_Message> local_send;
 
+    // moss P2P transport (optional; null when disabled or unavailable)
+    MossTransport *moss = nullptr;
+    std::chrono::high_resolution_clock::time_point last_moss_presence{};
+
     struct Connection *find_connection(CSteamID id, uint32 appid = 0);
     struct Connection *new_connection(CSteamID id, uint32 appid);
 
@@ -127,6 +149,13 @@ class Networking
     bool handle_low_level_udp(Common_Message *msg, IP_PORT ip_port);
     bool handle_tcp(Common_Message *msg, struct TCP_Socket &socket);
     void send_announce_broadcasts();
+
+    // moss helpers
+    void init_moss(const Moss_Config &cfg);
+    bool handle_moss_announce(Common_Message *msg, const std::array<uint8_t, 32> &sender);
+    void send_moss_presence();
+    bool moss_publish_msg(Common_Message *msg);
+    void run_moss();
 
     bool add_id_connection(struct Connection *connection, CSteamID steam_id);
     void run_callbacks(Callback_Ids id, Common_Message *msg);
@@ -137,7 +166,7 @@ class Networking
 
 
 public:
-    Networking(CSteamID id, uint32 appid, uint16 port, std::set<IP_PORT> *custom_broadcasts, bool disable_sockets, bool crossapp_messaging = false);
+    Networking(CSteamID id, uint32 appid, uint16 port, std::set<IP_PORT> *custom_broadcasts, bool disable_sockets, bool crossapp_messaging = false, const Moss_Config *moss_config = nullptr);
     ~Networking();
     
     //NOTE: for all functions ips/ports are passed/returned in host byte order

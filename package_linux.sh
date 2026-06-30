@@ -22,6 +22,13 @@ cp -f -r "post_build/steam_settings.EXAMPLE/" "$target_src_dir/"
 cp -f "post_build/README.release.md" "$target_src_dir/"
 cp -f "CHANGELOG.md" "$target_src_dir/"
 cp -f "CREDITS.md" "$target_src_dir/"
+
+# bundle moss P2P runtime (loaded dynamically at runtime) if a build is vendored
+if [ -f "third-party/moss/libmoss.so" ]; then
+  echo "// bundling moss P2P runtime (libmoss.so)"
+  cp -f "third-party/moss/libmoss.so" "$target_src_dir/"
+  cp -f "third-party/moss/README.md" "$target_src_dir/README.moss.md"
+fi
 if [[ "$2" = "1" ]]; then
   cp -f "post_build/README.debug.md" "$target_src_dir/"
 fi

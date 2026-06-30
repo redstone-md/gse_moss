@@ -1,0 +1,8 @@
+# moss pre-shared key — a single 64-character hex string (32 bytes).
+# When present, the mesh is CLOSED: only peers using the exact same PSK can join.
+# Every machine in your group must use the identical value. Omit for an open mesh.
+#
+# Rename this file to "moss_psk.txt" to use it, and replace the value below.
+# Generate one with, e.g.:  openssl rand -hex 32
+#
+# 0000000000000000000000000000000000000000000000000000000000000000

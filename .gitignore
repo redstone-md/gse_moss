@@ -11,7 +11,9 @@
 
 # SPECIFIC
 /build
-/third-party
+# ignore third-party contents, but DO track the vendored moss P2P runtime
+/third-party/*
+!/third-party/moss
 
 # TOOLS
 

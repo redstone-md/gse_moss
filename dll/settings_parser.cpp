@@ -155,6 +155,53 @@ static void load_custom_broadcasts(const std::string &base_path, std::set<IP_POR
     }
 }
 
+// moss_trackers.txt / moss_static_peers.txt: one entry per line
+static void load_moss_lines(const std::string &base_path, const char *filename, std::vector<std::string> &out)
+{
+    const std::string filepath(base_path + filename);
+    std::ifstream file(std::filesystem::u8path(filepath));
+    if (file.is_open()) {
+        common_helpers::consume_bom(file);
+        PRINT_DEBUG("loading moss file '%s'", filepath.c_str());
+        std::string line{};
+        while (std::getline(file, line)) {
+            // trim trailing CR/whitespace
+            while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ' || line.back() == '\t'))
+                line.pop_back();
+            if (line.empty() || line[0] == '#' || line[0] == ';') continue;
+            out.push_back(line);
+            PRINT_DEBUG("added moss entry '%s'", line.c_str());
+        }
+    }
+}
+
+// moss_psk.txt: a single 64-char hex string (32 bytes)
+static void load_moss_psk(const std::string &base_path, std::vector<uint8_t> &out)
+{
+    if (!out.empty()) return; // already loaded from a higher-priority path
+    const std::string filepath(base_path + "moss_psk.txt");
+    std::ifstream file(std::filesystem::u8path(filepath));
+    if (!file.is_open()) return;
+    common_helpers::consume_bom(file);
+    std::string hex{};
+    std::getline(file, hex);
+    // strip anything that isn't a hex digit
+    std::string clean{};
+    for (char c : hex) {
+        if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))
+            clean.push_back(c);
+    }
+    if (clean.size() != 64) {
+        if (!clean.empty())
+            PRINT_DEBUG("moss_psk.txt: expected 64 hex chars (32 bytes), got %zu, ignoring", clean.size());
+        return;
+    }
+    out.resize(32);
+    for (size_t i = 0; i < 32; ++i)
+        out[i] = (uint8_t)std::stoul(clean.substr(i * 2, 2), nullptr, 16);
+    PRINT_DEBUG("loaded 32-byte moss psk");
+}
+
 // subscribed_groups_clans.txt
 static void load_subscribed_groups_clans(const std::string &base_path, Settings *settings_client, Settings *settings_server)
 {
@@ -2119,6 +2166,18 @@ static void parse_simple_features(class Settings *settings_client, class Setting
     settings_client->download_steamhttp_requests = ini.GetBoolValue("main::connectivity", "download_steamhttp_requests", settings_client->download_steamhttp_requests);
     settings_server->download_steamhttp_requests = ini.GetBoolValue("main::connectivity", "download_steamhttp_requests", settings_server->download_steamhttp_requests);
 
+    // [main::moss] P2P transport
+    settings_client->enable_moss = ini.GetBoolValue("main::moss", "enable_moss", settings_client->enable_moss);
+    settings_server->enable_moss = ini.GetBoolValue("main::moss", "enable_moss", settings_server->enable_moss);
+
+    {
+        const char *room_key = ini.GetValue("main::moss", "room_key", "");
+        if (room_key && room_key[0]) {
+            settings_client->moss_room_key = room_key;
+            settings_server->moss_room_key = room_key;
+        }
+    }
+
 
     // [main::misc]
     settings_client->achievement_bypass = ini.GetBoolValue("main::misc", "achievements_bypass", settings_client->achievement_bypass);
@@ -2502,6 +2561,17 @@ uint32 create_localstorage_settings(Settings **settings_client_out, Settings **s
     parse_subscribed_groups(settings_client, settings_server);
     load_subscribed_groups_clans(local_storage->get_global_settings_path(), settings_client, settings_server);
     load_subscribed_groups_clans(steam_settings_path, settings_client, settings_server);
+
+    // moss P2P transport extra config (steam_settings path overrides global)
+    load_moss_lines(local_storage->get_global_settings_path(), "moss_trackers.txt", settings_client->moss_trackers);
+    load_moss_lines(steam_settings_path, "moss_trackers.txt", settings_client->moss_trackers);
+    load_moss_lines(local_storage->get_global_settings_path(), "moss_static_peers.txt", settings_client->moss_static_peers);
+    load_moss_lines(steam_settings_path, "moss_static_peers.txt", settings_client->moss_static_peers);
+    load_moss_psk(steam_settings_path, settings_client->moss_psk);
+    load_moss_psk(local_storage->get_global_settings_path(), settings_client->moss_psk);
+    settings_server->moss_trackers = settings_client->moss_trackers;
+    settings_server->moss_static_peers = settings_client->moss_static_peers;
+    settings_server->moss_psk = settings_client->moss_psk;
 
     parse_mods_folder(settings_client, settings_server, local_storage);
     load_gamecontroller_settings(settings_client);

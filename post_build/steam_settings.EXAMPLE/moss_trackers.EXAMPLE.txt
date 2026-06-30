@@ -1,0 +1,14 @@
+# moss tracker list — one entry per line.
+# These are the rendezvous servers moss uses to find other peers in your mesh.
+# Lines starting with # or ; are ignored.
+#
+# Rename this file to "moss_trackers.txt" to use it.
+# If the file is absent, moss uses its built-in default tracker set.
+#
+# Supported forms:
+#   udp://tracker.opentrackr.org:1337/announce
+#   https://tracker.example.org/announce
+#
+# Example:
+# udp://tracker.opentrackr.org:1337/announce
+# udp://open.tracker.cl:1337/announce
