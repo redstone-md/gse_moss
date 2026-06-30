@@ -2178,6 +2178,9 @@ static void parse_simple_features(class Settings *settings_client, class Setting
         }
     }
 
+    settings_client->moss_listen_port = (int)ini.GetLongValue("main::moss", "listen_port", settings_client->moss_listen_port);
+    settings_server->moss_listen_port = settings_client->moss_listen_port;
+
 
     // [main::misc]
     settings_client->achievement_bypass = ini.GetBoolValue("main::misc", "achievements_bypass", settings_client->achievement_bypass);

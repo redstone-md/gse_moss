@@ -305,6 +305,9 @@ public:
     std::vector<std::string> moss_static_peers{};
     // optional 32-byte pre-shared key for an encrypted closed mesh. empty => open mesh.
     std::vector<uint8_t> moss_psk{};
+    // fixed UDP port moss listens on. A stable port is important for NAT traversal
+    // (keeps the external mapping consistent across runs). 0 => let moss auto-pick.
+    int moss_listen_port = 41666;
 
     //gameserver source query
     bool disable_source_query = false;

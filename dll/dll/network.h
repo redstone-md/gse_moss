@@ -114,6 +114,7 @@ struct Moss_Config {
     std::vector<std::string> static_peers{}; // optional direct dial peers
     std::vector<uint8_t> psk{};              // optional 32-byte pre-shared key
     std::string identity_path{};             // file to persist node identity
+    int listen_port = 41666;                 // fixed moss UDP port (stable NAT mapping)
 };
 
 class Networking

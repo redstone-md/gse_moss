@@ -970,7 +970,7 @@ void Networking::init_moss(const Moss_Config &cfg)
 
     moss = new MossTransport();
     bool ok = moss->init(mesh_id, channel, cfg.psk, cfg.trackers, cfg.static_peers,
-                         cfg.identity_path, /*high_throughput*/ true);
+                         cfg.identity_path, /*high_throughput*/ true, cfg.listen_port);
     if (!ok) {
         PRINT_DEBUG("moss: init failed, continuing with LAN transport only");
         delete moss;

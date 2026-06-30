@@ -116,7 +116,8 @@ bool MossTransport::init(const std::string &mesh_id,
                          const std::vector<std::string> &trackers,
                          const std::vector<std::string> &static_peers,
                          const std::string &identity_path,
-                         bool high_throughput)
+                         bool high_throughput,
+                         int listen_port)
 {
     if (enabled) return true;
     if (g_moss_active) {
@@ -165,7 +166,12 @@ bool MossTransport::init(const std::string &mesh_id,
     if (!static_peers.empty()) {
         cfg["static_peers"] = static_peers;
     }
-    cfg["listen_port"] = 0; // auto-pick
+    // A FIXED listen port is important for NAT traversal: with a random port each
+    // run, the node's external address changes every session, trackers accumulate
+    // stale dead-port entries for our stable identity, and UPnP can't keep a
+    // consistent mapping — peers then connect to dead ports and flap. A fixed port
+    // keeps the external mapping stable so hole-punching / UPnP actually hold.
+    cfg["listen_port"] = (listen_port > 0 && listen_port < 65536) ? listen_port : 41666;
     // Re-announce to trackers more often than the 120s default so two players who
     // start a minute apart still discover each other quickly, and so a dropped
     // candidate is retried sooner.

@@ -83,6 +83,7 @@ Steam_Client::Steam_Client()
     moss_config.trackers = settings_server->moss_trackers;
     moss_config.static_peers = settings_server->moss_static_peers;
     moss_config.psk = settings_server->moss_psk;
+    moss_config.listen_port = settings_server->moss_listen_port;
     moss_config.identity_path = local_storage->get_global_settings_path() + "moss_identity.bin";
 
     network = new Networking(settings_server->get_local_steam_id(), appid, settings_server->get_port(), &(settings_server->custom_broadcasts), settings_server->disable_networking, settings_server->enable_crossapp_messaging, &moss_config);

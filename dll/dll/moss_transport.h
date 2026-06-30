@@ -82,7 +82,8 @@ public:
               const std::vector<std::string> &trackers,
               const std::vector<std::string> &static_peers,
               const std::string &identity_path,
-              bool high_throughput);
+              bool high_throughput,
+              int listen_port);
 
     void shutdown();
 
