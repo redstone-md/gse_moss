@@ -953,16 +953,20 @@ void Networking::init_moss(const Moss_Config &cfg)
 {
     if (moss) return;
 
-    // mesh_id selects the rendezvous (tracker infohash): per-appid by default,
-    // or a private room when a room key is configured.
-    std::string mesh_id;
+    // The rendezvous "scope" controls BOTH the tracker infohash (who meets in the
+    // mesh) and the pub/sub channel (who exchanges messages). They must be the same
+    // string on every peer that wants to play together. With a room key, peers align
+    // regardless of appid (handy when the emulated appid differs between machines);
+    // otherwise the scope is the appid so same-game peers find each other by default.
+    std::string scope;
     if (!cfg.room_key.empty()) {
-        mesh_id = "gse-room-" + cfg.room_key;
+        scope = "gse-room-" + cfg.room_key;
     } else {
-        mesh_id = "gse-app-" + std::to_string(this->appid);
+        scope = "gse-app-" + std::to_string(this->appid);
     }
-    // channel is always appid-scoped so a shared room mesh still separates games
-    std::string channel = "gse-app-" + std::to_string(this->appid);
+    std::string mesh_id = scope;
+    std::string channel = scope;
+    PRINT_DEBUG("[MOSS-DIAG] init_moss scope='%s' appid=%u", scope.c_str(), this->appid);
 
     moss = new MossTransport();
     bool ok = moss->init(mesh_id, channel, cfg.psk, cfg.trackers, cfg.static_peers,
