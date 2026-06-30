@@ -1063,32 +1063,48 @@ void Networking::run_moss()
     if (check_timedout(last_moss_presence, BROADCAST_INTERVAL)) {
         send_moss_presence();
         last_moss_presence = now;
+        // periodic mesh-connectivity diagnostics: how many transport-level peers does
+        // moss currently see, and how many of our app connections are moss-backed.
+        int moss_peers = moss->peer_count();
+        int moss_conns = 0;
+        for (auto &c : connections) if (c.via_moss) ++moss_conns;
+        PRINT_DEBUG("[MOSS-DIAG] moss transport peers=%d, moss-backed app connections=%d, total connections=%zu",
+            moss_peers, moss_conns, connections.size());
     }
 
     std::vector<MossInbound> msgs;
     moss->poll_messages(msgs);
+    size_t inbound_count = msgs.size();
+    size_t self_dropped = 0, announces = 0, app_msgs = 0;
     for (auto &m : msgs) {
         // drop our own echoed publishes (moss delivers local publishes back to us);
         // self-delivery for messages addressed to ourselves still flows via local_send.
-        if (m.sender == moss->own_public_key()) continue;
+        if (m.sender == moss->own_public_key()) { ++self_dropped; continue; }
 
         Common_Message msg;
         if (!msg.ParseFromArray(m.data.data(), static_cast<int>(m.data.size()))) continue;
         if (!msg.source_id()) continue;
 
         if (msg.has_announce()) {
+            ++announces;
             handle_moss_announce(&msg, m.sender);
         } else {
+            ++app_msgs;
             // mark synthetic source addressing then dispatch like any other message
             msg.set_source_ip(0x0A000000u | (uint32)(msg.source_id() & 0x00FFFFFFu));
             do_callbacks_message(&msg);
         }
     }
+    if (inbound_count) {
+        PRINT_DEBUG("[MOSS-DIAG] moss inbound msgs=%zu (self-echo dropped=%zu, announces=%zu, app=%zu)",
+            inbound_count, self_dropped, announces, app_msgs);
+    }
 
     std::vector<MossEvent> evs;
     moss->poll_events(evs);
-    // peer join/leave at the transport layer is informational here; application
-    // level presence/timeout is driven by announce messages + USER_TIMEOUT.
+    for (auto &e : evs) {
+        PRINT_DEBUG("[MOSS-DIAG] moss event type=%d detail=%s", e.type, e.detail_json.c_str());
+    }
 }
 
 Common_Message Networking::create_announce(bool request)
