@@ -98,6 +98,7 @@ public:
 
     const std::array<uint8_t, 32> &own_public_key() const { return public_key; }
     int peer_count() const;
+    std::string nat_type() const; // "" if unknown/unavailable
 
 private:
     // called by the static C trampolines

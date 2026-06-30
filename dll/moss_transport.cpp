@@ -166,10 +166,27 @@ bool MossTransport::init(const std::string &mesh_id,
         cfg["static_peers"] = static_peers;
     }
     cfg["listen_port"] = 0; // auto-pick
+    // Re-announce to trackers more often than the 120s default so two players who
+    // start a minute apart still discover each other quickly, and so a dropped
+    // candidate is retried sooner.
+    cfg["announce_interval_sec"] = 30;
+    // Enable automatic router port-mapping. Without this, two peers behind home
+    // NATs frequently fail to hole-punch (sessions don't form, or only one
+    // direction works, so the gossipsub mesh never grafts and app messages never
+    // flow). UPnP / NAT-PMP / PCP open the listen port on cooperating routers and
+    // make direct connectivity dramatically more reliable.
+    cfg["nat"] = {
+        {"upnp_enabled", true},
+        {"natpmp_enabled", true},
+        {"pcp_enabled", true},
+        {"hole_punch_attempts", 5},
+        {"port_prediction_enabled", true},
+    };
     if (high_throughput) {
         cfg["transport"] = { {"high_throughput", true} };
     }
     std::string cfg_str = cfg.dump();
+    PRINT_DEBUG("[MOSS-DIAG] moss config: %s", cfg_str.c_str());
 
     uint8_t *psk_ptr = nullptr;
     uint8_t psk_buf[32];
@@ -277,6 +294,20 @@ int MossTransport::peer_count() const
     } catch (...) {}
     p_Free(info);
     return count;
+}
+
+std::string MossTransport::nat_type() const
+{
+    if (!enabled || !p_GetMeshInfo || node < 0) return "";
+    char *info = p_GetMeshInfo(node);
+    if (!info) return "";
+    std::string nat;
+    try {
+        auto j = nlohmann::json::parse(info);
+        if (j.contains("nat_type")) nat = j["nat_type"].get<std::string>();
+    } catch (...) {}
+    p_Free(info);
+    return nat;
 }
 
 // ---- callback handling --------------------------------------------------------

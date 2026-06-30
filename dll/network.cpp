@@ -1072,8 +1072,9 @@ void Networking::run_moss()
         int moss_peers = moss->peer_count();
         int moss_conns = 0;
         for (auto &c : connections) if (c.via_moss) ++moss_conns;
-        PRINT_DEBUG("[MOSS-DIAG] moss transport peers=%d, moss-backed app connections=%d, total connections=%zu",
-            moss_peers, moss_conns, connections.size());
+        std::string nat = moss->nat_type();
+        PRINT_DEBUG("[MOSS-DIAG] moss transport peers=%d, moss-backed app connections=%d, total connections=%zu, nat_type=%s",
+            moss_peers, moss_conns, connections.size(), nat.c_str());
     }
 
     std::vector<MossInbound> msgs;
