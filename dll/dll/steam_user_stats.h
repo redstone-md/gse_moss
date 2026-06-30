@@ -166,6 +166,7 @@ private:
     void send_pending_user_stats_requests();
     void process_pending_user_stats_requests(Common_Message *msg);
     void steam_run_callback();
+    void steam_run_callback_impl();
 
     // requests from server
     void network_stats_initial(Common_Message *msg);

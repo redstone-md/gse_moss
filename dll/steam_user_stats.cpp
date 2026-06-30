@@ -454,6 +454,20 @@ bool Steam_User_Stats::IndicateAchievementProgress( CGameID nGameID, const char 
 
 void Steam_User_Stats::steam_run_callback()
 {
+    // Safety net: the stats/achievements paths do a lot of nlohmann::json access on
+    // game-supplied / partially-configured data. A single type/parse error here used
+    // to throw out of the periodic callback and take the whole game down. Contain it.
+    try {
+        steam_run_callback_impl();
+    } catch (const std::exception &e) {
+        PRINT_DEBUG("Steam_User_Stats::steam_run_callback() swallowed exception: %s", e.what());
+    } catch (...) {
+        PRINT_DEBUG("Steam_User_Stats::steam_run_callback() swallowed unknown exception");
+    }
+}
+
+void Steam_User_Stats::steam_run_callback_impl()
+{
     send_updated_stats();
     load_achievements_icons();
     send_pending_user_stats_requests();
@@ -468,9 +482,14 @@ void Steam_User_Stats::steam_run_callback()
         // write global_percent into every achievement entry and save to disk
         bool changed = false;
         for (auto &kv : global_achievement_percentages) {
-            float existing = user_achievements[kv.first].value("global_percent", -1.0f);
+            // only annotate achievements we actually know about; user_achievements[key]
+            // would insert a null for unknown keys and value()/[] on a non-object json
+            // throws type_error.306 (crash) — skip anything missing or not an object.
+            auto it = user_achievements.find(kv.first);
+            if (it == user_achievements.end() || !it->is_object()) continue;
+            float existing = it->value("global_percent", -1.0f);
             if (existing != kv.second) {
-                user_achievements[kv.first]["global_percent"] = kv.second;
+                (*it)["global_percent"] = kv.second;
                 changed = true;
             }
         }
