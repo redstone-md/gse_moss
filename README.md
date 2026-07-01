@@ -1,7 +1,21 @@
-## :large_orange_diamond: **Goldberg Steam Emu**
+## :large_orange_diamond: **Goldberg Steam Emu — moss P2P edition**
 Fork of https://gitlab.com/Mr_Goldberg/goldberg_emulator with a lot of fixes, improvements, additional features and a completely reworked file structure.
 
+This edition adds **peer-to-peer online multiplayer** on top of the emulator's
+networking, built on the [moss](https://github.com/redstone-md/moss) P2P mesh — so
+players on different networks can find each other and play over the internet, not
+just on a LAN. See **[docs/MOSS_P2P.md](./docs/MOSS_P2P.md)** for setup.
+
 ### Feel free to make a PR.
+
+---
+
+:warning: **Legal / usage notice** — this is an independent, community project, **not
+affiliated with or endorsed by Valve Corporation**. It ships no games or
+copyrighted content and performs no communication with Valve's Steam network. Use
+it **only with software you legally own** and in accordance with the law where you
+live. Please read **[DISCLAIMER.md](./DISCLAIMER.md)** before use. Provided **as is,
+without warranty** (LGPL-3.0).
 
 ---
 

@@ -1,3 +1,14 @@
+## 2026/07/01
+
+* **[Rxflex]** net: **peer-to-peer online multiplayer over [moss](https://github.com/redstone-md/moss)** — the `Networking` layer now runs a moss P2P mesh node alongside the legacy LAN broadcast, so lobbies/friends/matchmaking/networking-sockets work over the internet (tracker rendezvous, UPnP/NAT-PMP/PCP + hole-punch/relay NAT traversal, Noise-encrypted transport). `moss.dll`/`libmoss.so` is dynamically loaded at runtime; absent/failed load falls back to LAN-only
+* **[Rxflex]** net/moss: joins a shared `global` mesh (relay-capable) scoped to a `gse-app-<appid>` channel; optional `room_key` for a private mesh; fixed default UDP port `41666` for stable NAT mapping; presence announced immediately on peer connect and taken over onto moss for reliable delivery
+* **[Rxflex]** config: new `[main::moss]` section (`enable_moss`, `room_key`, `listen_port`) and `steam_settings/` files `moss_trackers.txt`, `moss_static_peers.txt`, `moss_psk.txt` (with `.EXAMPLE`s); moss runtime vendored at `third-party/moss/` and bundled by the packaging scripts
+* **[Rxflex]** matchmaking: auto-accept joins into **joinable** lobbies (browser/code joins no longer strand on a manual overlay accept that never appears); manual approval kept for non-joinable/invite-only lobbies
+* **[Rxflex]** stats: fixed a crash in `Steam_User_Stats::steam_run_callback` (nlohmann `type_error.306` when global achievement percentages referenced an achievement missing from `user_achievements`); added a try/catch safety net around the stats callback
+* **[Rxflex]** docs: added `docs/MOSS_P2P.md` (setup/config/troubleshooting) and `DISCLAIMER.md` (legal/usage notice)
+
+---
+
 ## 2026/05/17
 
 * **[alex47exe]** overlay: per-notification-type configurable WAV sound files in `steam_settings/sounds/`; full load-time fallback chain (`<type>.wav` → `notification.wav` → silence); example WAV files and `sounds/README.md` included

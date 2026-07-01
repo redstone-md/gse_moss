@@ -14,6 +14,7 @@
 - [third-party\deps\linux\cmake](#third-partydepslinuxcmake)
 - [third-party\deps\win\7za](#third-partydepswin7za)
 - [third-party\deps\win\cmake](#third-partydepswincmake)
+- [third-party\moss](#third-partymoss)
 - [libs\detours](#libsdetours)
 - [libs\fifo_map](#libsfifo_map)
 - [libs\gamepad](#libsgamepad)
@@ -2385,6 +2386,26 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+### third-party\moss
+
+#### INFO
+
+https://github.com/redstone-md/moss
+
+Embeddable P2P mesh core used for the emulator's peer-to-peer online multiplayer
+transport. Vendored as a prebuilt shared library under `third-party/moss/` and
+loaded at runtime.
+
+#### LICENSE
+
+MIT License
+
+Copyright (c) 2026 redstone-md
+
+(Full text vendored at `third-party/moss/LICENSE`.)
+
+---
 
 ### libs\json
 
