@@ -1021,13 +1021,6 @@ bool Networking::handle_moss_announce(Common_Message *msg, const std::array<uint
     uint32 ann_appid = msg->announce().appid();
 
     Connection *conn = find_connection((uint64)msg->source_id(), ann_appid);
-    // If we already reach this peer via a live LAN connection, keep LAN and just
-    // refresh liveness — don't hijack it onto moss (avoids duplicate delivery).
-    if (conn && !conn->via_moss) {
-        conn->last_received = std::chrono::high_resolution_clock::now();
-        return true;
-    }
-
     bool is_new = false;
     if (!conn) {
         conn = new_connection((uint64)msg->source_id(), ann_appid);
@@ -1038,6 +1031,16 @@ bool Networking::handle_moss_announce(Common_Message *msg, const std::array<uint
         is_new = true;
     }
 
+    // We hear this peer over the moss mesh, so moss can reliably reach them. If the
+    // legacy LAN broadcast / public-IP peer-exchange already created this connection
+    // as a direct one (via_moss=false), TAKE IT OVER for moss: the direct UDP/TCP
+    // path to a remote NATed peer flaps and drops sends (this is exactly why lobby
+    // joins failed — the join was routed over the dead direct socket). moss pub/sub
+    // delivery is proven reliable, so prefer it whenever we've heard the peer on it.
+    if (!conn->via_moss) {
+        PRINT_DEBUG("[MOSS-DIAG] taking over LAN connection for user %llu onto moss transport",
+            (uint64)msg->source_id());
+    }
     conn->via_moss = true;
     conn->moss_sender = sender;
     conn->appid = ann_appid;
