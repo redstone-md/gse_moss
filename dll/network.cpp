@@ -1116,8 +1116,19 @@ void Networking::run_moss()
 
     std::vector<MossEvent> evs;
     moss->poll_events(evs);
+    bool peer_joined = false;
     for (auto &e : evs) {
         PRINT_DEBUG("[MOSS-DIAG] moss event type=%d detail=%s", e.type, e.detail_json.c_str());
+        if (e.type == MOSS_EVENT_PEER_JOINED) peer_joined = true;
+    }
+    // When a transport peer connects, announce ourselves immediately instead of
+    // waiting up to BROADCAST_INTERVAL. Sessions between NATed peers can be short
+    // lived, so we want the SteamID presence exchanged inside that window; combined
+    // with moss's per-heartbeat subscription refresh this lets the app-level
+    // discovery complete as soon as the session (and topic mesh) is up.
+    if (peer_joined) {
+        send_moss_presence();
+        last_moss_presence = now;
     }
 }
 
