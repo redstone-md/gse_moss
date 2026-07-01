@@ -1889,8 +1889,23 @@ void Steam_Matchmaking::Callback(Common_Message *msg)
                                 if (sf) sf->force_resend_friend_data();
                             }
                             PRINT_DEBUG("Auto-accepted invited user %llu for lobby %llu", (uint64)msg->source_id(), (uint64)lobby->room_id());
+                        } else if (lobby->joinable()) {
+                            // Public/joinable lobby: joining by ID/browser code is accepted
+                            // automatically, matching real Steam (the owner's approval is not
+                            // required for a joinable lobby). The overlay Accept/Decline queue
+                            // below is only appropriate for non-joinable/invite lobbies and
+                            // otherwise silently strands the joiner ("lobby no longer exists")
+                            // when no overlay prompt is shown or acted on.
+                            if (add_member_to_lobby(lobby, requester)) {
+                                trigger_lobby_member_join_leave((uint64)lobby->room_id(), (uint64)msg->source_id(), false, true, 0.01);
+                                SendJoinResponse((uint64)lobby->room_id(), (uint64)msg->source_id(), true);
+                                send_lobby_data();
+                                Steam_Friends *sf = get_steam_client()->steam_friends;
+                                if (sf) sf->force_resend_friend_data();
+                                PRINT_DEBUG("Auto-accepted join from %llu for joinable lobby %llu", (uint64)msg->source_id(), (uint64)lobby->room_id());
+                            }
                         } else {
-                            // Unsolicited join — queue for overlay Accept/Decline notification
+                            // Non-joinable/invite-only lobby — queue for overlay Accept/Decline notification
                             auto existing = std::find_if(pending_lobby_join_requests.begin(), pending_lobby_join_requests.end(),
                                 [&](const Pending_Lobby_Join_Request &r) {
                                     return r.lobby_id == CSteamID((uint64)lobby->room_id()) && r.requester_id == requester;
