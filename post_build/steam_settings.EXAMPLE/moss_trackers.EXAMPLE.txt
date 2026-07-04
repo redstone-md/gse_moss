@@ -1,14 +1,31 @@
 # moss tracker list — one entry per line.
 # These are the rendezvous servers moss uses to find other peers in your mesh.
+# A node announces to ALL of them, so any two peers only need ONE tracker that
+# BOTH can reach in order to find each other.
 # Lines starting with # or ; are ignored.
 #
-# Rename this file to "moss_trackers.txt" to use it.
-# If the file is absent, moss uses its built-in default tracker set.
+# Rename this file to "moss_trackers.txt" to OVERRIDE the built-in defaults with
+# exactly this list. If the file is absent, moss uses its built-in default set
+# (which already includes the international + Russia/CIS trackers below).
 #
 # Supported forms:
-#   udp://tracker.opentrackr.org:1337/announce
-#   https://tracker.example.org/announce
+#   udp://host:port/announce
+#   http(s)://host:port/announce
 #
-# Example:
+# --- International (broadly reachable) ---
 # udp://tracker.opentrackr.org:1337/announce
-# udp://open.tracker.cl:1337/announce
+# udp://open.demonii.com:1337/announce
+# udp://tracker.torrent.eu.org:451/announce
+# udp://open.stealth.si:80/announce
+# udp://tracker.qu.ax:6969/announce
+# udp://exodus.desync.com:6969/announce
+#
+# --- Russia / CIS hosted (reachable from RU networks where the above are often
+#     blocked or time out) ---
+# udp://retracker.hotplug.ru:2710/announce
+# udp://tracker.playground.ru:6969/announce
+# udp://retracker01-msk-virt.corbina.net:80/announce
+#
+# Tip: if you and your friends are all behind blocked/CGNAT networks and no
+# tracker works, skip trackers entirely — use a VPN (ZeroTier) and list each
+# other's addresses in moss_static_peers.txt instead.
