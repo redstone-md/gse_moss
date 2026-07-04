@@ -171,7 +171,7 @@ bool MossTransport::init(const std::string &mesh_id,
     // stale dead-port entries for our stable identity, and UPnP can't keep a
     // consistent mapping — peers then connect to dead ports and flap. A fixed port
     // keeps the external mapping stable so hole-punching / UPnP actually hold.
-    cfg["listen_port"] = (listen_port > 0 && listen_port < 65536) ? listen_port : 41666;
+    int preferred_port = (listen_port > 0 && listen_port < 65536) ? listen_port : 41666;
     // Re-announce to trackers more often than the 120s default so two players who
     // start a minute apart still discover each other quickly, and so a dropped
     // candidate is retried sooner.
@@ -191,8 +191,6 @@ bool MossTransport::init(const std::string &mesh_id,
     if (high_throughput) {
         cfg["transport"] = { {"high_throughput", true} };
     }
-    std::string cfg_str = cfg.dump();
-    PRINT_DEBUG("[MOSS-DIAG] moss config: %s", cfg_str.c_str());
 
     uint8_t *psk_ptr = nullptr;
     uint8_t psk_buf[32];
@@ -201,24 +199,44 @@ bool MossTransport::init(const std::string &mesh_id,
         psk_ptr = psk_buf;
     }
 
-    std::string mesh_id_mut = mesh_id;
-    node = p_Init(&mesh_id_mut[0], psk_ptr, &cfg_str[0]);
-    if (node < 0) {
-        PRINT_DEBUG("moss: Moss_Init failed with code %lld", (long long)node);
-        g_moss_active = nullptr;
-        moss_dlclose(lib_handle);
-        lib_handle = nullptr;
-        return false;
-    }
+    // Try the fixed port first (stable NAT mapping). moss binds BOTH tcp4 and udp4
+    // on this port and does not retry a fixed port, so if either is unavailable
+    // (already held by another instance / a lingering process, or blocked) Start
+    // fails. Fall back to an auto-assigned port (0) so moss still comes up instead
+    // of silently dropping to LAN-only.
+    int try_ports[2] = { preferred_port, 0 };
+    bool started = false;
+    for (int pi = 0; pi < 2 && !started; ++pi) {
+        cfg["listen_port"] = try_ports[pi];
+        std::string cfg_str = cfg.dump();
+        if (pi == 0) PRINT_DEBUG("[MOSS-DIAG] moss config: %s", cfg_str.c_str());
 
-    p_SetCallback(node, &MossTransport::msg_trampoline);
-    p_SetEventCallback(node, &MossTransport::event_trampoline);
+        std::string mesh_id_mut = mesh_id;
+        node = p_Init(&mesh_id_mut[0], psk_ptr, &cfg_str[0]);
+        if (node < 0) {
+            PRINT_DEBUG("moss: Moss_Init failed with code %lld (port %d)", (long long)node, try_ports[pi]);
+            continue;
+        }
 
-    int32_t start_rc = p_Start(node);
-    if (start_rc != 0) {
-        PRINT_DEBUG("moss: Moss_Start failed with code %d", start_rc);
+        p_SetCallback(node, &MossTransport::msg_trampoline);
+        p_SetEventCallback(node, &MossTransport::event_trampoline);
+
+        int32_t start_rc = p_Start(node);
+        if (start_rc == 0) {
+            started = true;
+            if (pi == 1) {
+                PRINT_DEBUG("[MOSS-DIAG] fixed port %d unavailable — moss started on an auto-assigned port "
+                            "(NAT mapping less stable; free port %d or forward it for best results)",
+                            preferred_port, preferred_port);
+            }
+            break;
+        }
+        PRINT_DEBUG("moss: Moss_Start failed with code %d on port %d%s",
+            start_rc, try_ports[pi], pi == 0 ? " — retrying on an auto-assigned port" : "");
         p_Stop(node);
         node = -1;
+    }
+    if (!started) {
         g_moss_active = nullptr;
         moss_dlclose(lib_handle);
         lib_handle = nullptr;
