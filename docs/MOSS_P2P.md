@@ -59,6 +59,22 @@ Optional files in the `steam_settings/` folder (see the `*.EXAMPLE` versions):
 
 ---
 
+## Not supported: Proton / Wine
+
+The moss runtime (`moss.dll`) is a Go library and its networking relies on
+Windows IOCP, which **Wine/Proton do not implement well enough** — under
+Wine it cannot bind its sockets at all (`Moss_Start` fails), so **moss P2P does
+not work when the Windows build is run through Proton/Wine**. The emulator
+detects this and falls back to LAN-only networking automatically (fast, no hang).
+
+If you're on Linux and want online play:
+
+- Use the **native Linux emulator build + `libmoss.so`** with a native Linux game
+  (then moss runs natively and works), **or**
+- For a Windows game under Proton/Wine, play over the legacy LAN transport via a
+  **VPN (ZeroTier) + `custom_broadcasts.txt`** (this path uses classic Winsock,
+  which Wine supports fine) instead of moss.
+
 ## If it won't connect
 
 Most home routers can be traversed automatically (moss uses UPnP / NAT-PMP / PCP

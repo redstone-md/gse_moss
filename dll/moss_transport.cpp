@@ -202,11 +202,21 @@ bool MossTransport::init(const std::string &mesh_id,
     // Try the fixed port first (stable NAT mapping). moss binds BOTH tcp4 and udp4
     // on this port and does not retry a fixed port, so if either is unavailable
     // (already held by another instance / a lingering process, or blocked) Start
-    // fails. Fall back to an auto-assigned port (0) so moss still comes up instead
-    // of silently dropping to LAN-only.
-    int try_ports[2] = { preferred_port, 0 };
+    // fails. Fall back to a couple of specific alternate ports so moss still comes
+    // up instead of silently dropping to LAN-only.
+    //
+    // We deliberately do NOT fall back to port 0 (auto): under Proton/Wine the Go
+    // runtime cannot bind sockets at all (IOCP is unsupported), so EVERY bind
+    // fails, and port 0 makes moss retry 64 times (~10s) before giving up — hanging
+    // game startup for Wine users who can't use moss anyway. Specific ports fail
+    // fast, so the drop to LAN-only is immediate there.
+    int try_ports[3] = {
+        preferred_port,
+        preferred_port < 65535 ? preferred_port + 1 : 41667,
+        preferred_port < 65534 ? preferred_port + 2 : 41668,
+    };
     bool started = false;
-    for (int pi = 0; pi < 2 && !started; ++pi) {
+    for (int pi = 0; pi < 3 && !started; ++pi) {
         cfg["listen_port"] = try_ports[pi];
         std::string cfg_str = cfg.dump();
         if (pi == 0) PRINT_DEBUG("[MOSS-DIAG] moss config: %s", cfg_str.c_str());
@@ -224,15 +234,15 @@ bool MossTransport::init(const std::string &mesh_id,
         int32_t start_rc = p_Start(node);
         if (start_rc == 0) {
             started = true;
-            if (pi == 1) {
-                PRINT_DEBUG("[MOSS-DIAG] fixed port %d unavailable — moss started on an auto-assigned port "
-                            "(NAT mapping less stable; free port %d or forward it for best results)",
-                            preferred_port, preferred_port);
+            if (pi != 0) {
+                PRINT_DEBUG("[MOSS-DIAG] fixed port %d unavailable — moss started on port %d "
+                            "(NAT mapping less stable; free %d or forward it for best results)",
+                            preferred_port, try_ports[pi], preferred_port);
             }
             break;
         }
         PRINT_DEBUG("moss: Moss_Start failed with code %d on port %d%s",
-            start_rc, try_ports[pi], pi == 0 ? " — retrying on an auto-assigned port" : "");
+            start_rc, try_ports[pi], pi < 2 ? " — trying next port" : " — giving up, LAN only");
         p_Stop(node);
         node = -1;
     }
