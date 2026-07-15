@@ -135,6 +135,10 @@ private:
     int32_t (*p_SetKeyStore)(MossKeyStoreLoadCallback, MossKeyStoreSaveCallback) = nullptr;
     char *(*p_GetMeshInfo)(MossHandle) = nullptr;
     uint8_t *(*p_GetPublicKey)(MossHandle) = nullptr;
+    // Optional (newer moss.dll): returns the human-readable OS reason behind a
+    // coarse failure code — chiefly the bind error behind a failed Moss_Start.
+    // Resolved best-effort; may stay null against an older dll.
+    char *(*p_LastError)(MossHandle) = nullptr;
     void (*p_Free)(void *) = nullptr;
 };
 

@@ -141,6 +141,13 @@ bool MossTransport::init(const std::string &mesh_id,
     resolve(lib_handle, "Moss_GetMeshInfo", p_GetMeshInfo, ok);
     resolve(lib_handle, "Moss_GetPublicKey", p_GetPublicKey, ok);
     resolve(lib_handle, "Moss_Free", p_Free, ok);
+    // Optional: present only on newer moss.dll. Resolve with a throwaway flag so a
+    // missing symbol does not fail init against an older dll.
+    {
+        bool has_last_error = true;
+        resolve(lib_handle, "Moss_LastError", p_LastError, has_last_error);
+        (void)has_last_error;
+    }
     if (!ok) {
         PRINT_DEBUG("moss: failed to resolve required symbols");
         moss_dlclose(lib_handle);
@@ -205,11 +212,15 @@ bool MossTransport::init(const std::string &mesh_id,
     // fails. Fall back to a couple of specific alternate ports so moss still comes
     // up instead of silently dropping to LAN-only.
     //
-    // We deliberately do NOT fall back to port 0 (auto): under Proton/Wine the Go
-    // runtime cannot bind sockets at all (IOCP is unsupported), so EVERY bind
-    // fails, and port 0 makes moss retry 64 times (~10s) before giving up — hanging
-    // game startup for Wine users who can't use moss anyway. Specific ports fail
-    // fast, so the drop to LAN-only is immediate there.
+    // We try a few specific ports rather than port 0 (auto). A fixed port keeps
+    // the external NAT mapping stable across runs (see above). Historically port 0
+    // also had to be avoided because older Proton/Wine could not bind Go sockets
+    // at all (the netpoller's IOCP association was unsupported), and port 0 made
+    // moss retry 64 times (~10s) before giving up — hanging game startup. Newer
+    // moss.dll fixes the Wine case directly: it falls back to a raw blocking
+    // Winsock socket when the netpoller can't bind, and comes up UDP-only if TCP
+    // can't bind, so Proton users (e.g. Steam Deck) now get a working P2P
+    // transport on the fixed port instead of dropping to LAN-only.
     int try_ports[3] = {
         preferred_port,
         preferred_port < 65535 ? preferred_port + 1 : 41667,
@@ -243,6 +254,15 @@ bool MossTransport::init(const std::string &mesh_id,
         }
         PRINT_DEBUG("moss: Moss_Start failed with code %d on port %d%s",
             start_rc, try_ports[pi], pi < 2 ? " — trying next port" : " — giving up, LAN only");
+        // Surface the real OS reason (e.g. the bind error under Wine/Proton).
+        // Must be read BEFORE Moss_Stop, which drops the handle from the registry.
+        if (p_LastError) {
+            char *reason = p_LastError(node);
+            if (reason) {
+                if (reason[0]) PRINT_DEBUG("moss: Moss_Start reason (code %d): %s", start_rc, reason);
+                if (p_Free) p_Free(reason);
+            }
+        }
         p_Stop(node);
         node = -1;
     }
