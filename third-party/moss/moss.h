@@ -152,6 +152,7 @@ extern int32_t Moss_Start(MossHandle handle);
 extern int32_t Moss_Stop(MossHandle handle);
 extern int32_t Moss_Subscribe(MossHandle handle, char* channel);
 extern int32_t Moss_Connect(MossHandle handle, char* addr);
+extern int32_t Moss_ConnectToPeer(MossHandle handle, char* peerID);
 extern int32_t Moss_Unsubscribe(MossHandle handle, char* channel);
 extern int32_t Moss_Publish(MossHandle handle, char* channel, uint8_t* data, uint32_t length);
 extern int32_t Moss_SetCallback(MossHandle handle, MossMessageCallback cb);
