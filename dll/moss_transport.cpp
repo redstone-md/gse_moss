@@ -80,6 +80,13 @@ static bool resolve(void *handle, const char *symbol, T &out, bool &ok)
     return out != nullptr;
 }
 
+void MossTransport::log_event(const char *level, const char *kind, const char *message)
+{
+    if (p_LogEvent && node >= 0) {
+        p_LogEvent(node, level ? level : "info", kind ? kind : "", message ? message : "", "");
+    }
+}
+
 // ================================================================================
 // MossTransport
 // ================================================================================
@@ -147,6 +154,9 @@ bool MossTransport::init(const std::string &mesh_id,
         bool has_last_error = true;
         resolve(lib_handle, "Moss_LastError", p_LastError, has_last_error);
         (void)has_last_error;
+        bool has_log_event = true;
+        resolve(lib_handle, "Moss_LogEvent", p_LogEvent, has_log_event);
+        (void)has_log_event;
     }
     if (!ok) {
         PRINT_DEBUG("moss: failed to resolve required symbols");
@@ -198,6 +208,15 @@ bool MossTransport::init(const std::string &mesh_id,
     if (high_throughput) {
         cfg["transport"] = { {"high_throughput", true} };
     }
+    // Ship moss's own errors (listen/tracker/handshake/relay failures, incl. the
+    // Wine/Proton bind failure) and periodic node-stats to Axiom so we can see
+    // real-world failures across players. The token is INGEST-ONLY (write-only to
+    // the moss-events dataset) — safe to embed in the client, same trust model as
+    // a Sentry DSN. moss ships nothing unless these are set.
+    cfg["axiom_token"] = "xaat-4538c70c-0b19-48ba-91d1-9f1143ef8485";
+    cfg["axiom_dataset"] = "moss-events";
+    cfg["axiom_endpoint"] = "https://eu-central-1.aws.edge.axiom.co";
+    cfg["axiom_service"] = "gse";
 
     uint8_t *psk_ptr = nullptr;
     uint8_t psk_buf[32];
@@ -245,6 +264,7 @@ bool MossTransport::init(const std::string &mesh_id,
         int32_t start_rc = p_Start(node);
         if (start_rc == 0) {
             started = true;
+            log_event("info", "transport_started", "moss transport up");
             if (pi != 0) {
                 PRINT_DEBUG("[MOSS-DIAG] fixed port %d unavailable — moss started on port %d "
                             "(NAT mapping less stable; free %d or forward it for best results)",

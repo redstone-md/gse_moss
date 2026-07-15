@@ -139,7 +139,14 @@ private:
     // coarse failure code — chiefly the bind error behind a failed Moss_Start.
     // Resolved best-effort; may stay null against an older dll.
     char *(*p_LastError)(MossHandle) = nullptr;
+    // Optional (newer moss.dll): ship a structured event to Axiom (no-op unless
+    // the axiom_* config keys were set). level/kind/message/fieldsJSON.
+    int32_t (*p_LogEvent)(MossHandle, const char *, const char *, const char *, const char *) = nullptr;
     void (*p_Free)(void *) = nullptr;
+
+    // log_event is a best-effort helper for app-level telemetry; a no-op when the
+    // dll predates Moss_LogEvent or Axiom is disabled.
+    void log_event(const char *level, const char *kind, const char *message);
 };
 
 #endif // MOSS_TRANSPORT_INCLUDE

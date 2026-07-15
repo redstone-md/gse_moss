@@ -165,6 +165,8 @@ extern char* Moss_GetMeshInfo(MossHandle handle);
 extern uint8_t* Moss_GetPublicKey(MossHandle handle);
 extern char* Moss_GetNATType(MossHandle handle);
 extern char* Moss_LastError(MossHandle handle);
+extern int32_t Moss_EnableAxiom(MossHandle handle, char* token, char* dataset, char* endpoint, char* service);
+extern int32_t Moss_LogEvent(MossHandle handle, char* level, char* kind, char* message, char* fieldsJSON);
 extern char* Moss_GetNetworkStats(MossHandle handle);
 extern void Moss_Free(void* ptr);
 
