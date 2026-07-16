@@ -1,3 +1,12 @@
+## 2026/07/16
+
+* **[Rxflex]** moss: bundled runtime → v0.6.20, rolling up several reliability fixes from a P2P soak-testing session.
+* **[Rxflex]** moss/windows: **fixed a client crash under sustained load.** The vendored `moss.dll` is now built with the **Go 1.25** toolchain. Go 1.26.1's Windows runtime corrupts memory (`0xc0000005`) under the heavy concurrent UDP the DHT drives, crashing the client after minutes; Go 1.25 is verified stable — a 13-minute soak with DHT enabled delivered 259/259 messages at 0% loss with no crash. DHT stays enabled.
+* **[Rxflex]** moss/wine: **Proton / Steam Deck support.** moss falls back to a raw blocking-socket UDP path when the Go netpoller cannot bind (older Wine/Proton, where IOCP association fails), and comes up UDP-only when TCP cannot bind — Proton players now get working P2P instead of dropping to LAN-only. A failed `Moss_Start` now surfaces the real OS bind reason via `Moss_LastError`.
+* **[Rxflex]** moss/telemetry: **opt-in error reporting to Axiom.** moss's failures (listen/tracker/handshake/relay, incl. the Wine bind failure) and periodic node stats ship to a central `moss-events` dataset, so real-world player failures are queryable instead of asking for logs. Ingest-only token embedded like a Sentry DSN; `Moss_LogEvent` lets app code report its own issues (e.g. lobby not visible).
+
+---
+
 ## 2026/07/01
 
 * **[Rxflex]** net: **peer-to-peer online multiplayer over [moss](https://github.com/redstone-md/moss)** — the `Networking` layer now runs a moss P2P mesh node alongside the legacy LAN broadcast, so lobbies/friends/matchmaking/networking-sockets work over the internet (tracker rendezvous, UPnP/NAT-PMP/PCP + hole-punch/relay NAT traversal, Noise-encrypted transport). `moss.dll`/`libmoss.so` is dynamically loaded at runtime; absent/failed load falls back to LAN-only
