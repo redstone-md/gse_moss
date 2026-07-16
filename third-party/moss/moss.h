@@ -147,28 +147,28 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern MossHandle Moss_Init(char* meshID, uint8_t* psk, char* config);
-extern int32_t Moss_Start(MossHandle handle);
-extern int32_t Moss_Stop(MossHandle handle);
-extern int32_t Moss_Subscribe(MossHandle handle, char* channel);
-extern int32_t Moss_Connect(MossHandle handle, char* addr);
-extern int32_t Moss_ConnectToPeer(MossHandle handle, char* peerID);
-extern int32_t Moss_Unsubscribe(MossHandle handle, char* channel);
-extern int32_t Moss_Publish(MossHandle handle, char* channel, uint8_t* data, uint32_t length);
-extern int32_t Moss_SetCallback(MossHandle handle, MossMessageCallback cb);
-extern int32_t Moss_SetEventCallback(MossHandle handle, MossEventCallback cb);
-extern int32_t Moss_SetScoringCallback(MossHandle handle, MossScoringCallback cb);
-extern int32_t Moss_RelaySendTo(MossHandle handle, char* targetPeerID, uint8_t* data, int32_t length);
-extern int32_t Moss_SetRelayCallback(MossHandle handle, MossRelayCallback cb);
-extern int32_t Moss_SetKeyStore(MossKeyStoreLoadCallback load, MossKeyStoreSaveCallback save);
-extern char* Moss_GetMeshInfo(MossHandle handle);
-extern uint8_t* Moss_GetPublicKey(MossHandle handle);
-extern char* Moss_GetNATType(MossHandle handle);
-extern char* Moss_LastError(MossHandle handle);
-extern int32_t Moss_EnableAxiom(MossHandle handle, char* token, char* dataset, char* endpoint, char* service);
-extern int32_t Moss_LogEvent(MossHandle handle, char* level, char* kind, char* message, char* fieldsJSON);
-extern char* Moss_GetNetworkStats(MossHandle handle);
-extern void Moss_Free(void* ptr);
+extern __declspec(dllexport) MossHandle Moss_Init(char* meshID, uint8_t* psk, char* config);
+extern __declspec(dllexport) int32_t Moss_Start(MossHandle handle);
+extern __declspec(dllexport) int32_t Moss_Stop(MossHandle handle);
+extern __declspec(dllexport) int32_t Moss_Subscribe(MossHandle handle, char* channel);
+extern __declspec(dllexport) int32_t Moss_Connect(MossHandle handle, char* addr);
+extern __declspec(dllexport) int32_t Moss_ConnectToPeer(MossHandle handle, char* peerID);
+extern __declspec(dllexport) int32_t Moss_Unsubscribe(MossHandle handle, char* channel);
+extern __declspec(dllexport) int32_t Moss_Publish(MossHandle handle, char* channel, uint8_t* data, uint32_t length);
+extern __declspec(dllexport) int32_t Moss_SetCallback(MossHandle handle, MossMessageCallback cb);
+extern __declspec(dllexport) int32_t Moss_SetEventCallback(MossHandle handle, MossEventCallback cb);
+extern __declspec(dllexport) int32_t Moss_SetScoringCallback(MossHandle handle, MossScoringCallback cb);
+extern __declspec(dllexport) int32_t Moss_RelaySendTo(MossHandle handle, char* targetPeerID, uint8_t* data, int32_t length);
+extern __declspec(dllexport) int32_t Moss_SetRelayCallback(MossHandle handle, MossRelayCallback cb);
+extern __declspec(dllexport) int32_t Moss_SetKeyStore(MossKeyStoreLoadCallback load, MossKeyStoreSaveCallback save);
+extern __declspec(dllexport) char* Moss_GetMeshInfo(MossHandle handle);
+extern __declspec(dllexport) uint8_t* Moss_GetPublicKey(MossHandle handle);
+extern __declspec(dllexport) char* Moss_GetNATType(MossHandle handle);
+extern __declspec(dllexport) char* Moss_LastError(MossHandle handle);
+extern __declspec(dllexport) int32_t Moss_EnableAxiom(MossHandle handle, char* token, char* dataset, char* endpoint, char* service);
+extern __declspec(dllexport) int32_t Moss_LogEvent(MossHandle handle, char* level, char* kind, char* message, char* fieldsJSON);
+extern __declspec(dllexport) char* Moss_GetNetworkStats(MossHandle handle);
+extern __declspec(dllexport) void Moss_Free(void* ptr);
 
 #ifdef __cplusplus
 }
